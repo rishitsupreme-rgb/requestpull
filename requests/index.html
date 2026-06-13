@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saharo Services | Lead Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📊</text></svg>">
+  <link rel="stylesheet" href="style.css?v=1.1">
+  <link rel="stylesheet" href="requests.css?v=1.1">
+</head>
+<body>
+
+  <!-- Background Canvas for Neon Orange Arrows -->
+  <canvas id="arrows-canvas"></canvas>
+
+  <header class="top-header" style="position: absolute;">
+    <div class="logo-wrap">
+      <a href="../index.html" class="logo-link">
+        <span class="logo-text-base">SAHARO SERVICES<span class="dot">.</span></span>
+        <span class="logo-text-clean">SAHARO SERVICES<span class="dot">.</span></span>
+        <span class="broom-icon">
+          <svg class="broom-svg" viewBox="0 0 100 100" width="28" height="28" style="filter: drop-shadow(0 2px 6px rgba(255, 102, 0, 0.55)); vertical-align: middle;">
+            <line x1="75" y1="25" x2="40" y2="60" stroke="#e5e7eb" stroke-width="6" stroke-linecap="round" />
+            <line x1="75" y1="25" x2="40" y2="60" stroke="#ff6600" stroke-width="2.5" stroke-linecap="round" />
+            <path d="M33 55 L47 69 L41 73 L29 60 Z" fill="#ffcc00" stroke="#ffb300" stroke-width="1" />
+            <path d="M31 58 L12 80 C10 82, 17 87, 20 85 L39 63 Z" fill="#ff8000" />
+            <path d="M35 62 L18 87 C16 89, 23 93, 26 91 L43 66 Z" fill="#ffcc66" />
+            <path d="M38 65 L24 92 C22 94, 30 96, 32 93 L47 69 Z" fill="#ff5500" />
+          </svg>
+        </span>
+      </a>
+    </div>
+    <div class="cta-wrap">
+      <a href="../index.html" class="header-cta" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">← Main Site</a>
+    </div>
+  </header>
+
+  <main class="dashboard-layout">
+    <div class="dash-header">
+      <div>
+        <h1 class="dash-title">Lead Submissions</h1>
+        <p class="dash-subtitle">Incoming booking requests saved in browser local storage</p>
+      </div>
+      <button class="clear-btn" id="clear-all-btn">Clear All Leads</button>
+    </div>
+
+    <!-- Stats Cards Grid -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <span class="stat-label">Total Leads Received</span>
+        <span class="stat-value" id="stat-count">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Total Pipeline Value</span>
+        <span class="stat-value highlight" id="stat-value">₹0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Average Monthly Salary</span>
+        <span class="stat-value" id="stat-avg">₹0</span>
+      </div>
+    </div>
+
+    <!-- Leads Table Box -->
+    <div class="requests-table-card">
+      <table class="req-table" id="leads-table">
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Customer Name</th>
+            <th>Phone Number</th>
+            <th>Selected Package</th>
+            <th>Monthly Salary</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="leads-tbody">
+          <!-- Dynamically populated -->
+        </tbody>
+      </table>
+      <div id="no-leads-placeholder" class="no-data-msg" style="display: none;">
+        📥 No lead requests arrived yet. Go to ../index.html and submit a booking form!
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // 1. Setup Canvas Animation (neon orange arrows)
+    function initArrowsCanvas() {
+      const canvas = document.getElementById('arrows-canvas');
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      let arrows = [];
+      const spacing = 38;
+      const maxDistance = 140;
+      
+      let mouseX = -1000;
+      let mouseY = -1000;
+      let time = 0;
+      
+      window.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+      });
+      
+      window.addEventListener('mouseleave', () => {
+        mouseX = -1000;
+        mouseY = -1000;
+      });
+      
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        setupArrows();
+      }
+      
+      window.addEventListener('resize', resizeCanvas);
+      
+      function setupArrows() {
+        arrows = [];
+        const cols = Math.ceil(canvas.width / spacing) + 1;
+        const rows = Math.ceil(canvas.height / spacing) + 1;
+        
+        for (let c = 0; c < cols; c++) {
+          for (let r = 0; r < rows; r++) {
+            arrows.push({
+              baseX: c * spacing,
+              baseY: r * spacing,
+              dispX: 0,
+              dispY: 0,
+              opacity: 0.05
+            });
+          }
+        }
+      }
+      
+      let lastScrollY = window.scrollY;
+      let smoothVelocity = 0;
+      
+      function loop() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        time += 0.016;
+        
+        const currentScroll = window.scrollY;
+        const scrollDelta = currentScroll - lastScrollY;
+        lastScrollY = currentScroll;
+        smoothVelocity += (scrollDelta - smoothVelocity) * 0.15;
+        
+        arrows.forEach(arrow => {
+          let y = arrow.baseY + (currentScroll * -0.15);
+          y = ((y % canvas.height) + canvas.height) % canvas.height;
+          
+          const tiltX = smoothVelocity * 0.12 * (y / canvas.height);
+          const x = arrow.baseX + tiltX;
+          
+          const dx = mouseX - x;
+          const dy = mouseY - y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          const pos = arrow.baseX + arrow.baseY;
+          const waveFactor = Math.pow((Math.sin(pos * 0.0014 - time) + 1) * 0.5, 4.5);
+          const waveOpacity = 0.05 + waveFactor * 0.22;
+          
+          let targetDispX = 0;
+          let targetDispY = 0;
+          let targetOpacity = waveOpacity;
+          
+          if (distance < maxDistance) {
+            const force = (maxDistance - distance) / maxDistance;
+            const repelAngle = Math.atan2(dy, dx);
+            targetDispX = -Math.cos(repelAngle) * force * 26;
+            targetDispY = -Math.sin(repelAngle) * force * 26;
+            targetOpacity = waveOpacity + force * 0.72;
+          }
+          
+          arrow.dispX += (targetDispX - arrow.dispX) * 0.12;
+          arrow.dispY += (targetDispY - arrow.dispY) * 0.12;
+          arrow.opacity += (targetOpacity - arrow.opacity) * 0.12;
+          
+          const renderX = x + arrow.dispX;
+          const renderY = y + arrow.dispY;
+          
+          const edgeBuffer = 40;
+          let edgeFade = 1.0;
+          if (renderY < edgeBuffer) {
+            edgeFade = renderY / edgeBuffer;
+          } else if (renderY > canvas.height - edgeBuffer) {
+            edgeFade = (canvas.height - renderY) / edgeBuffer;
+          }
+          
+          const targetX = mouseX !== -1000 ? mouseX : canvas.width / 2;
+          const targetY = mouseY !== -1000 ? mouseY : canvas.height / 2 + Math.sin(time * 1.5) * 80;
+          const dxToMouse = targetX - renderX;
+          const dyToMouse = targetY - renderY;
+          const angle = Math.atan2(dyToMouse, dxToMouse);
+          
+          const size = 6;
+          ctx.save();
+          ctx.translate(renderX, renderY);
+          ctx.rotate(angle);
+          
+          const finalOpacity = Math.max(0, arrow.opacity * edgeFade);
+          if (finalOpacity > 0.15) {
+            ctx.shadowBlur = (finalOpacity - 0.1) * 14;
+            ctx.shadowColor = '#ff6600';
+          }
+          
+          ctx.beginPath();
+          ctx.moveTo(-size, 0);
+          ctx.lineTo(size, 0);
+          ctx.moveTo(size - 4, -3.5);
+          ctx.lineTo(size, 0);
+          ctx.lineTo(size - 4, 3.5);
+          
+          ctx.strokeStyle = `rgba(255, 102, 0, ${finalOpacity})`;
+          ctx.lineWidth = 1.6;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+          ctx.restore();
+        });
+        
+        requestAnimationFrame(loop);
+      }
+      
+      resizeCanvas();
+      loop();
+    }
+
+    // 2. Load and Render lead requests from localStorage
+    function loadLeads() {
+      const tbody = document.getElementById('leads-tbody');
+      const placeholder = document.getElementById('no-leads-placeholder');
+      const table = document.getElementById('leads-table');
+      
+      tbody.innerHTML = '';
+
+      // Load from localStorage
+      let localLeads = [];
+      try {
+        const rawLeads = localStorage.getItem('saharo_requests');
+        localLeads = rawLeads ? JSON.parse(rawLeads) : [];
+      } catch (e) {
+        console.error('Failed to parse local leads:', e);
+      }
+
+      // Map leads to preserve original indices during sorting
+      const mappedLeads = localLeads.map((lead, idx) => ({
+        ...lead,
+        originalIndex: idx
+      }));
+
+      // Sort in reverse chronological order (newest first)
+      mappedLeads.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      
+      if (mappedLeads.length === 0) {
+        placeholder.style.display = 'block';
+        table.style.display = 'none';
+        updateStats(0, 0, 0);
+        return;
+      }
+      
+      placeholder.style.display = 'none';
+      table.style.display = 'table';
+      
+      let totalValue = 0;
+      
+      mappedLeads.forEach((lead) => {
+        totalValue += parseInt(lead.price) || 0;
+        
+        const dateObj = new Date(lead.timestamp);
+        const formattedDate = dateObj.toLocaleString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="color: var(--text-muted); font-size: 0.85rem;">${formattedDate}</td>
+          <td style="font-weight: 600;">${escapeHtml(lead.name)}</td>
+          <td><a href="tel:${lead.phone}" class="phone-link">📞 ${escapeHtml(lead.phone)}</a></td>
+          <td>
+            <span class="pill-service">${escapeHtml(lead.summary)}</span>
+          </td>
+          <td class="price-col">₹${(lead.price || 0).toLocaleString('en-IN')}</td>
+          <td><button class="delete-req-btn" onclick="deleteLead(${lead.originalIndex})">Delete</button></td>
+        `;
+        
+        tbody.appendChild(tr);
+      });
+      
+      const avgValue = mappedLeads.length > 0 ? Math.round(totalValue / mappedLeads.length) : 0;
+      updateStats(mappedLeads.length, totalValue, avgValue);
+    }
+    
+    function updateStats(count, total, avg) {
+      document.getElementById('stat-count').textContent = count;
+      document.getElementById('stat-value').textContent = '₹' + total.toLocaleString('en-IN');
+      document.getElementById('stat-avg').textContent = '₹' + avg.toLocaleString('en-IN');
+    }
+    
+    function escapeHtml(text) {
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      };
+      return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+    
+    window.deleteLead = function(originalIndex) {
+      if (confirm('Delete this request from your browser local cache?')) {
+        const rawLeads = localStorage.getItem('saharo_requests');
+        if (rawLeads) {
+          const leads = JSON.parse(rawLeads);
+          leads.splice(originalIndex, 1);
+          localStorage.setItem('saharo_requests', JSON.stringify(leads));
+          loadLeads();
+        }
+      }
+    };
+    
+    // Clear all leads
+    document.getElementById('clear-all-btn').addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear all leads from your local cache? This cannot be undone.')) {
+        localStorage.removeItem('saharo_requests');
+        loadLeads();
+      }
+    });
+
+    // Logo Broom Sweeping & Sparkle Micro-Animation
+    function initLogoBroomAnimation() {
+      const logoLinks = document.querySelectorAll('.logo-link');
+      
+      logoLinks.forEach(logo => {
+        const cleanText = logo.querySelector('.logo-text-clean');
+        const broom = logo.querySelector('.broom-icon');
+        if (!cleanText || !broom) return;
+
+        let isAnimating = false;
+
+        function triggerBroom() {
+          if (isAnimating) return;
+          isAnimating = true;
+
+          // Make sure cleanText is visible (reset opacity if it was faded out)
+          cleanText.classList.remove('fade-out');
+          cleanText.style.opacity = '1';
+
+          broom.style.opacity = '1';
+          broom.style.transform = 'scale(1) rotate(0deg)';
+          
+          let startTime = null;
+          const duration = 2800; // 2.8s slow, premium sweep duration
+          const logoWidth = logo.offsetWidth;
+          
+          function animate(timestamp) {
+            if (!startTime) startTime = timestamp;
+            const progress = Math.min((timestamp - startTime) / duration, 1);
+            
+            // Sweep position from left to right (-15px offset for start position)
+            const broomLeft = -15 + (logoWidth + 10) * progress;
+            broom.style.left = `${broomLeft}px`;
+            
+            // Slow sweeping rotation back and forth (4 sweeps across the text)
+            const sweepAngle = Math.sin(progress * Math.PI * 4) * 16;
+            broom.style.transform = `scale(1) rotate(${sweepAngle - 20}deg)`;
+            
+            // Clip clean text layer in sync
+            const clipProgress = progress * 100;
+            cleanText.style.clipPath = `inset(0 ${100 - clipProgress}% 0 0)`;
+            
+            // Create sparkles trailing the broom (lower density for elegance)
+            if (Math.random() < 0.22 && progress < 0.95) {
+              createSparkle(logo, broomLeft + 10, logo.offsetHeight / 2 + (Math.random() - 0.5) * 12);
+            }
+            
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              // Sparkle burst on the dot at the end!
+              for (let i = 0; i < 6; i++) {
+                createSparkle(logo, logoWidth - 5, logo.offsetHeight / 2 + (Math.random() - 0.5) * 16, true);
+              }
+              
+              // Fade broom out slowly
+              setTimeout(() => {
+                broom.style.opacity = '0';
+                broom.style.transform = 'scale(0) rotate(0deg)';
+              }, 200);
+
+              // Hold the clean state for 1 second, then slowly fade back to dusty
+              setTimeout(() => {
+                cleanText.classList.add('fade-out');
+                
+                // Wait for 800ms transition to finish, then reset states
+                setTimeout(() => {
+                  cleanText.style.clipPath = 'inset(0 100% 0 0)';
+                  cleanText.classList.remove('fade-out');
+                  isAnimating = false; // Allow next sweep
+                }, 800);
+              }, 1000);
+            }
+          }
+          
+          requestAnimationFrame(animate);
+        }
+
+        // Trigger on hover
+        logo.addEventListener('mouseenter', triggerBroom);
+
+        // Reset clean mask on mouseleave (when not mid-animation)
+        logo.addEventListener('mouseleave', () => {
+          if (!isAnimating) {
+            cleanText.style.clipPath = 'inset(0 100% 0 0)';
+          }
+        });
+
+        // Trigger once automatically on page load after a short delay
+        setTimeout(triggerBroom, 1200);
+
+        // Periodic autoplay every 5 seconds (2.8s sweep + 1.0s hold + 0.8s fade + 0.4s pause)
+        setInterval(() => {
+          // Only autoplay if the user is not currently hovering over it
+          if (!logo.matches(':hover')) {
+            triggerBroom();
+          }
+        }, 5000);
+      });
+    }
+
+    function createSparkle(parent, x, y, isOrange = false) {
+      const sparkle = document.createElement('span');
+      sparkle.className = 'logo-sparkle';
+      sparkle.textContent = isOrange ? '✦' : '✨';
+      sparkle.style.left = `${x}px`;
+      sparkle.style.top = `${y}px`;
+      
+      if (isOrange) {
+        sparkle.style.color = 'var(--accent-orange)';
+        sparkle.style.fontSize = '0.9rem';
+      } else {
+        sparkle.style.fontSize = '0.75rem';
+      }
+      
+      // Set random motion vectors for the CSS custom variables
+      const dx = (Math.random() - 0.5) * 32;
+      const dy = -15 - Math.random() * 20;
+      const rotate = 90 + Math.random() * 180;
+      sparkle.style.setProperty('--dx', `${dx}px`);
+      sparkle.style.setProperty('--dy', `${dy}px`);
+      sparkle.style.setProperty('--rot', `${rotate}deg`);
+      
+      parent.appendChild(sparkle);
+      
+      // Auto-remove element after animation ends
+      setTimeout(() => {
+        sparkle.remove();
+      }, 800);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initArrowsCanvas();
+      loadLeads();
+      initLogoBroomAnimation();
+      
+      // Poll localStorage changes
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'saharo_requests') {
+          loadLeads();
+        }
+      });
+
+      // Poll local changes every 2 seconds to keep multiple tabs in sync
+      setInterval(loadLeads, 2000);
+    });
+  </script>
+</body>
+</html>
